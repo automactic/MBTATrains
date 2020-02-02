@@ -1,34 +1,30 @@
-from sqlalchemy import Table, Column, Integer, String, MetaData
-from sqlalchemy import create_engine
 import asyncpg
 
 
-metadata = MetaData()
-routes = Table(
-    'routes', metadata,
-    Column('id', String, primary_key=True),
-    Column('name', String),
-    Column('description', String),
-    Column('type', String),
-    Column('sort_order', Integer),
-    Column('color', String),
-    Column('text_color', String),
-)
+async def create_connection() -> asyncpg.Connection:
+    return await asyncpg.connect(database='mbta')
 
 
-def create_tables():
+async def create_tables():
     # create table if not exist
-    engine = create_engine('postgres://postgres@localhost/postgres')
-    conn = engine.connect()
-    conn = conn.execution_options(isolation_level="AUTOCOMMIT")
-    results = conn.execute("SELECT * FROM pg_database WHERE datname = 'mbta';").fetchone()
-    if not results:
-        conn.execute("CREATE DATABASE mbta;")
+    conn = await asyncpg.connect(database='postgres')
+    records = await conn.fetch("SELECT * FROM pg_database WHERE datname = 'mbta';")
+    if not records:
+        await conn.execute("CREATE DATABASE mbta;")
+    await conn.close()
 
     # create tables
-    engine = create_engine('postgres://postgres@localhost/mbta')
-    metadata.create_all(engine)
-
-
-async def create_asyncpg_conn() -> asyncpg.Connection:
-    return await asyncpg.connect('postgres://postgres@localhost/mbta')
+    conn = await create_connection()
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS routes (
+            id varchar PRIMARY KEY,
+            name varchar UNIQUE NOT NULL,
+            description varchar,
+            type varchar NOT NULL,
+            sort_order integer UNIQUE NOT NULL,
+            color varchar,
+            text_color varchar
+        );
+        CREATE INDEX sort_order on routes(sort_order);
+    ''')
+    await conn.close()
