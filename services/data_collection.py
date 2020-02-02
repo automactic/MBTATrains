@@ -58,26 +58,23 @@ class DataCollectionService:
         return routes
 
     async def retrieve_vehicles(self) -> [Vehicle]:
-        url = f'{self.endpoint}/vehicles'
-        params = {'filter[route]': 'Orange'}
+        response_json = await self.get(url=f'{self.endpoint}/vehicles', params={'filter[route_type]': '1'})
         vehicles = []
+        for data in response_json.get('data', []):
+            attributes = data.get('attributes', {})
+            try:
+                vehicle = Vehicle(
+                    id=data.get('id'),
+                    label=attributes.get('label'),
+                    status=attributes.get('current_status'),
+                    latitude=attributes.get('latitude'),
+                    longitude=attributes.get('longitude'),
+                    updated_at=datetime.fromisoformat(attributes.get('updated_at')),
+                    in_service=True,
+                )
+                vehicles.append(vehicle)
+            except TypeError as e:
+                logger.error('Error processing vehicle info', extra={'error': e})
 
-        async with self.session.get(url, params=params) as response:
-            response_json = await response.json()
-            for data in response_json.get('data', []):
-                attributes = data.get('attributes', {})
-                try:
-                    vehicle = Vehicle(
-                        id=data.get('id'),
-                        label=attributes.get('label'),
-                        latitude=attributes.get('latitude'),
-                        longitude=attributes.get('longitude'),
-                        current_status=attributes.get('current_status'),
-                        updated_at=datetime.fromisoformat(attributes.get('updated_at'))
-                    )
-                    vehicles.append(vehicle)
-                except TypeError as e:
-                    logger.error('Error processing vehicle info', extra={'error': e})
-
-        logger.info('Retrieved Vehicles')
+        logger.info(f'Retrieved {len(vehicles)} vehicle(s).')
         return vehicles

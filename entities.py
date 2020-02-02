@@ -16,7 +16,8 @@ class Route:
 class Vehicle:
     id: str
     label: str
+    status: str
     latitude: float
     longitude: float
-    current_status: str
     updated_at: datetime
+    in_service: bool = False
