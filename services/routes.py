@@ -7,7 +7,7 @@ class RouteService:
     def __init__(self, conn: asyncpg.Connection):
         self.conn = conn
 
-    async def list(self):
+    async def list(self) -> [Route]:
         records = await self.conn.fetch('''
             SELECT id, name, description, type, sort_order, color, text_color FROM routes
         ''')
