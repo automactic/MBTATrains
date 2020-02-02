@@ -2,16 +2,18 @@ import logging
 from datetime import datetime
 
 import aiohttp
+import asyncpg
 
 from entities import Route, Vehicle
-from services import RouteService
+from services.routes import RouteService
 
 logger = logging.getLogger(__name__)
 
 
 class DataCollectionService:
-    def __init__(self, session: aiohttp.ClientSession):
+    def __init__(self, session: aiohttp.ClientSession, conn: asyncpg.Connection):
         self.session = session
+        self.conn = conn
         self.endpoint = 'https://api-v3.mbta.com'
 
     async def get(self, url, params):
@@ -52,6 +54,7 @@ class DataCollectionService:
                 logger.error('Error processing route info', extra={'error': e})
 
         logger.info(f'Retrieved {len(routes)} route(s).')
+        await RouteService(self.conn).upsert(routes)
         return routes
 
     async def retrieve_vehicles(self) -> [Vehicle]:
