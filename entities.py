@@ -14,7 +14,6 @@ class Route:
 
 @dataclass
 class Vehicle:
-    id: str
     label: str
     status: str
     latitude: float

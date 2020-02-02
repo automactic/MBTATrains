@@ -34,15 +34,13 @@ async def create_tables():
     ''')
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS vehicles (
-            id varchar PRIMARY KEY,
-            label varchar UNIQUE NOT NULL,
+            label varchar PRIMARY KEY,
             status varchar NOT NULL,
             latitude float,
             longitude float,
             updated_at date,
             in_service bool NOT NULL DEFAULT false
         );
-        CREATE INDEX IF NOT EXISTS vehicles_label on vehicles(label);
         CREATE INDEX IF NOT EXISTS vehicles_status on vehicles(status);
         CREATE INDEX IF NOT EXISTS vehicles_updated_at on vehicles(updated_at);
         CREATE INDEX IF NOT EXISTS vehicles_in_service on vehicles(in_service);
