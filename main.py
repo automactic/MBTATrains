@@ -1,10 +1,10 @@
 import asyncio
 import logging
-
+import asyncpg
 import aiohttp
 
 from services.data_collection import DataCollectionService
-from sql import create_tables, create_connection
+from sql import create_tables, create_pool
 
 
 async def repeat(f, interval):
@@ -15,14 +15,13 @@ async def repeat(f, interval):
 async def main():
     await create_tables()
 
-    conn = await create_connection()
+    pool = await create_pool()
     async with aiohttp.ClientSession() as session:
-        service = DataCollectionService(session, conn)
+        service = DataCollectionService(session, pool)
         await asyncio.gather(
             repeat(service.retrieve_routes, 100),
             repeat(service.retrieve_vehicles, 5),
         )
-    await conn.close()
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')

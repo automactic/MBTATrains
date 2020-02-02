@@ -1,6 +1,10 @@
 import asyncpg
 
 
+async def create_pool() -> asyncpg.pool.Pool:
+    return await asyncpg.create_pool(database='mbta')
+
+
 async def create_connection() -> asyncpg.Connection:
     return await asyncpg.connect(database='mbta')
 
