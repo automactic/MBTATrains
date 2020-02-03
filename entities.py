@@ -20,3 +20,12 @@ class Vehicle:
     longitude: float
     updated_at: datetime
     in_service: bool = False
+
+
+@dataclass
+class Trip:
+    id: str
+    route_id: str
+    vehicle_label: str
+    head_sign: str
+    direction: str

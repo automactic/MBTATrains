@@ -4,7 +4,7 @@ from datetime import datetime
 import aiohttp
 import asyncpg
 
-from entities import Route, Vehicle
+from entities import Route, Vehicle, Trip
 from services.routes import RouteService
 from services.vehicles import VehicleService
 
@@ -61,13 +61,14 @@ class DataCollectionService:
         return routes
 
     async def retrieve_vehicles(self) -> [Vehicle]:
-        response_json = await self.get(url=f'{self.endpoint}/vehicles', params={'filter[route_type]': '1'})
-        vehicles = []
+        params = {'filter[route_type]': '1', 'include': 'trip,route'}
+        response_json = await self.get(url=f'{self.endpoint}/vehicles', params=params)
+
+        vehicles = {}
         for data in response_json.get('data', []):
             attributes = data.get('attributes', {})
             try:
                 vehicle = Vehicle(
-                    id=data.get('id'),
                     label=attributes.get('label'),
                     status=attributes.get('current_status'),
                     latitude=attributes.get('latitude'),
@@ -75,12 +76,67 @@ class DataCollectionService:
                     updated_at=datetime.fromisoformat(attributes.get('updated_at')),
                     in_service=True,
                 )
-                vehicles.append(vehicle)
+                vehicles[vehicle.label] = vehicle
             except TypeError as e:
                 logger.error('Error processing vehicle info', extra={'error': e})
-
         logger.info(f'Retrieved {len(vehicles)} vehicle(s).')
 
+        trips = self._processing_trips(response_json)
+
         async with self.pool.acquire() as conn:
-            await VehicleService(conn).upsert(vehicles)
-        return vehicles
+            service = VehicleService(conn)
+            out_of_service = set(await service.get_in_service_vehicle_labels()) - set(vehicles.keys())
+            if out_of_service:
+                await service.set_vehicle_out_of_service(list(out_of_service))
+                logger.info(f'Mark vehicles {out_of_service} as out of service.')
+
+            await service.upsert(vehicles.values())
+            await service.upsert_trips(trips)
+        return vehicles.values()
+
+    def _processing_trips(self, response_json) -> [Trip]:
+        """Extract trips the vehicles in services are making.
+
+        :param response_json: dict
+        :return: [Trip]
+        """
+
+        vehicle_labels = {}  # [trip_id, vehicle_label]
+        for data in response_json.get('data', []):
+            try:
+                trip_id = data['relationships']['trip']['data']['id']
+                vehicle_label = data['attributes']['label']
+                vehicle_labels[trip_id] = vehicle_label
+            except KeyError:
+                continue
+
+        direction = {}  # [route_id, [direction]]
+        trips_data = {}  # [trip_id, dict]
+        for data in response_json.get('included', []):
+            try:
+                data_id, data_type = data['id'], data['type']
+                if data_type == 'route':
+                    direction[data_id] = data['attributes']['direction_names']
+                elif data_type == 'trip':
+                    trips_data[data_id] = data
+            except KeyError:
+                continue
+
+        trips: [Trip] = []
+        for trip_id, data in trips_data.items():
+            try:
+                route_id = data['relationships']['route']['data']['id']
+                trip = Trip(
+                    id=trip_id,
+                    route_id=route_id,
+                    vehicle_label=vehicle_labels.get(trip_id),
+                    head_sign=data['attributes']['headsign'],
+                    direction=direction[route_id][data['attributes']['direction_id']]
+                )
+                trips.append(trip)
+            except KeyError:
+                continue
+
+        logger.info(f'Retrieved {len(trips)} trip(s).')
+
+        return trips

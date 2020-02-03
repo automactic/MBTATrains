@@ -45,4 +45,13 @@ async def create_tables():
         CREATE INDEX IF NOT EXISTS vehicles_updated_at on vehicles(updated_at);
         CREATE INDEX IF NOT EXISTS vehicles_in_service on vehicles(in_service);
     ''')
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS trips (
+            id varchar PRIMARY KEY,
+            route_id varchar REFERENCES routes(id),
+            vehicle_label varchar REFERENCES vehicles(label),
+            head_sign varchar,
+            direction varchar
+        );
+    ''')
     await conn.close()
